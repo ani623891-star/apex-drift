@@ -3,38 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apex Drift: Multi-Car</title>
+    <title>Apex Drift: Speed Fix</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
-        #loading { position: fixed; inset: 0; background: #111; color: #00f2ff; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
-        .spinner { width: 50px; height: 50px; border: 5px solid #333; border-top: 5px solid #00f2ff; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
-        #ui { position: absolute; bottom: 30px; left: 30px; color: white; pointer-events: none; z-index: 10; }
-        .btn { pointer-events: auto; background: #00f2ff; border: none; padding: 12px 25px; font-weight: bold; cursor: pointer; border-radius: 4px; font-style: italic; }
-        #nitro-hud { position: absolute; top: 30px; left: 50%; transform: translateX(-50%); width: 250px; height: 8px; background: rgba(255,255,255,0.1); border: 1px solid #fff; }
-        #nitro-fill { width: 100%; height: 100%; background: #00f2ff; transition: 0.1s; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial Black', sans-serif; }
+        
+        /* --- SPEED UNIT UI (The Fix) --- */
+        #ui-container {
+            position: absolute;
+            bottom: 40px;
+            right: 50px;
+            color: white;
+            text-align: right;
+            pointer-events: none;
+            z-index: 100;
+        }
+        #kmh-value { 
+            font-size: 80px; 
+            font-style: italic; 
+            line-height: 0.8;
+            text-shadow: 0 0 20px #00f2ff;
+        }
+        .unit-label { 
+            font-size: 20px; 
+            color: #00f2ff; 
+            letter-spacing: 2px;
+        }
+
+        #loading { position: fixed; inset: 0; background: #111; color: #00f2ff; display: flex; align-items: center; justify-content: center; z-index: 1000; }
     </style>
 </head>
 <body>
 
-<div id="loading">
-    <div class="spinner"></div>
-    <div id="status">UNBLOCKING GARAGE...</div>
-</div>
+<div id="loading">LOADING ASPHALT ENGINE...</div>
 
-<div id="ui">
-    <h1 id="car-name" style="margin: 0; font-style: italic; text-transform: uppercase;">FERRARI 458</h1>
-    <button class="btn" onclick="nextCar()">SWITCH SUPERCAR</button>
+<div id="ui-container">
+    <div id="kmh-value">0</div>
+    <div class="unit-label">KM/H</div>
 </div>
-
-<div id="nitro-hud"><div id="nitro-fill"></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x000000, 20, 100);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -45,51 +56,22 @@ const sun = new THREE.DirectionalLight(0xffffff, 2);
 sun.position.set(5, 10, 5);
 scene.add(sun);
 
-const grid = new THREE.GridHelper(1000, 60, 0x00f2ff, 0x111111);
+const grid = new THREE.GridHelper(1000, 40, 0x00f2ff, 0x111111);
 scene.add(grid);
 
-// GARAGE DATABASE
-const garage = [
-    { name: "Ferrari 458", url: "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Ferrari.glb", scale: 1.2 },
-    { name: "Asphalt Prototype", url: "https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf", scale: 2.5 }
-];
-
-let currentIdx = 0;
-let car = null;
+// LOAD FERRARI
+let car;
 const loader = new THREE.GLTFLoader();
+loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Ferrari.glb', (gltf) => {
+    car = gltf.scene;
+    car.scale.set(1.5, 1.5, 1.5);
+    car.rotation.y = Math.PI;
+    scene.add(car);
+    document.getElementById('loading').style.display = 'none';
+});
 
-function loadCar(idx) {
-    document.getElementById('loading').style.display = 'flex';
-    if (car) scene.remove(car);
-
-    loader.load(garage[idx].url, (gltf) => {
-        car = gltf.scene;
-        car.scale.set(garage[idx].scale, garage[idx].scale, garage[idx].scale);
-        car.rotation.y = Math.PI;
-        scene.add(car);
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('car-name').innerText = garage[idx].name;
-    }, undefined, (err) => {
-        // FAIL-SAFE: If model is blocked, create a professional 3D block car
-        const geo = new THREE.BoxGeometry(2, 0.8, 4);
-        const mat = new THREE.MeshStandardMaterial({ color: 0x00f2ff, metalness: 0.8, roughness: 0.2 });
-        car = new THREE.Mesh(geo, mat);
-        scene.add(car);
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('car-name').innerText = "OFFLINE CAR";
-    });
-}
-
-function nextCar() {
-    currentIdx = (currentIdx + 1) % garage.length;
-    loadCar(currentIdx);
-}
-
-loadCar(0);
-
-// CONTROLS
+// SPEED LOGIC
 let speed = 0;
-let nitro = 100;
 const keys = {};
 window.onkeydown = (e) => keys[e.code] = true;
 window.onkeyup = (e) => keys[e.code] = false;
@@ -97,33 +79,29 @@ window.onkeyup = (e) => keys[e.code] = false;
 function animate() {
     requestAnimationFrame(animate);
     if (car) {
-        let isBoosting = keys['ShiftLeft'] && nitro > 0;
-        let maxSpeed = isBoosting ? 2.5 : 1.3;
-
+        // Accelerate
         if (keys['KeyW'] || keys['ArrowUp']) {
-            if (speed < maxSpeed) speed += 0.02;
+            if (speed < 2.0) speed += 0.02;
         } else {
-            speed *= 0.96;
+            speed *= 0.97; // Natural slowdown
         }
 
-        if (keys['KeyA'] || keys['ArrowLeft']) car.position.x -= speed * 0.4;
-        if (keys['KeyD'] || keys['ArrowRight']) car.position.x += speed * 0.4;
+        // --- THE SPEED DISPLAY FIX ---
+        // We multiply the small 'game speed' (2.0) by 150 to get a realistic KM/H number
+        let displaySpeed = Math.floor(speed * 150);
+        document.getElementById('kmh-value').innerText = displaySpeed;
 
-        if (isBoosting) {
-            nitro -= 0.6;
-            camera.fov = 85;
-        } else {
-            camera.fov = 75;
-            if (nitro < 100) nitro += 0.2;
-        }
-        camera.updateProjectionMatrix();
+        // Steering
+        if (keys['KeyA'] || keys['ArrowLeft']) car.position.x -= speed * 0.3;
+        if (keys['KeyD'] || keys['ArrowRight']) car.position.x += speed * 0.3;
 
-        grid.position.z += speed * 15;
+        // Move Road
+        grid.position.z += speed * 20;
         if (grid.position.z > 20) grid.position.z = 0;
-        
-        camera.position.set(car.position.x, 2.5, car.position.z + 7);
+
+        // Camera Follow
+        camera.position.set(car.position.x, 2.5, car.position.z + 8);
         camera.lookAt(car.position.x, 1, car.position.z - 5);
-        document.getElementById('nitro-fill').style.width = nitro + "%";
     }
     renderer.render(scene, camera);
 }
