@@ -3,42 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apex Drift: Speed Fix</title>
+    <title>Apex Drift: Pro Edition</title>
     <style>
+        :root { --neon: #00f2ff; --nitro: #ff00ea; --brake: #ff0000; }
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial Black', sans-serif; }
+        #ui-layer { position: absolute; inset: 0; pointer-events: none; z-index: 100; color: white; }
         
-        /* --- SPEED UNIT UI (The Fix) --- */
-        #ui-container {
-            position: absolute;
-            bottom: 40px;
-            right: 50px;
-            color: white;
-            text-align: right;
-            pointer-events: none;
-            z-index: 100;
-        }
-        #kmh-value { 
-            font-size: 80px; 
-            font-style: italic; 
-            line-height: 0.8;
-            text-shadow: 0 0 20px #00f2ff;
-        }
-        .unit-label { 
-            font-size: 20px; 
-            color: #00f2ff; 
-            letter-spacing: 2px;
-        }
+        /* Speedometer */
+        #speedo { position: absolute; bottom: 40px; right: 50px; text-align: right; }
+        #kmh-num { font-size: 80px; font-style: italic; line-height: 0.8; text-shadow: 0 0 20px var(--neon); }
+        
+        /* Mini-Map */
+        #map-container { position: absolute; top: 30px; right: 30px; width: 120px; height: 120px; background: rgba(0,0,0,0.6); border: 2px solid var(--neon); border-radius: 10px; }
+        #player-dot { position: absolute; width: 8px; height: 8px; background: var(--neon); border-radius: 50%; left: 50%; top: 50%; transform: translate(-50%, -50%); }
 
-        #loading { position: fixed; inset: 0; background: #111; color: #00f2ff; display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        /* Nitro Bar */
+        #nitro-hud { position: absolute; top: 30px; left: 50%; transform: translateX(-50%); width: 250px; height: 8px; background: rgba(255,255,255,0.1); border: 1px solid #fff; }
+        #nitro-fill { width: 100%; height: 100%; background: linear-gradient(90deg, var(--neon), var(--nitro)); }
+
+        #loading { position: fixed; inset: 0; background: #111; display: flex; align-items: center; justify-content: center; z-index: 1000; color: var(--neon); font-size: 18px; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
-<div id="loading">LOADING ASPHALT ENGINE...</div>
+<div id="loading">Syncing Asphalt Garage...</div>
 
-<div id="ui-container">
-    <div id="kmh-value">0</div>
-    <div class="unit-label">KM/H</div>
+<div id="ui-layer">
+    <div id="map-container"><div id="player-dot"></div></div>
+    <div id="nitro-hud"><div id="nitro-fill"></div></div>
+    <div id="speedo">
+        <div id="kmh-num">0</div>
+        <div style="color: var(--neon); font-size: 18px;">KM/H</div>
+    </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -46,32 +42,48 @@
 
 <script>
 const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x000000, 10, 150);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 scene.add(new THREE.AmbientLight(0xffffff, 1));
-const sun = new THREE.DirectionalLight(0xffffff, 2);
+const sun = new THREE.DirectionalLight(0xffffff, 1.5);
 sun.position.set(5, 10, 5);
 scene.add(sun);
 
-const grid = new THREE.GridHelper(1000, 40, 0x00f2ff, 0x111111);
-scene.add(grid);
+const trackGroup = new THREE.Group();
+scene.add(trackGroup);
+const grid = new THREE.GridHelper(2000, 80, 0x00f2ff, 0x222222);
+trackGroup.add(grid);
 
-// LOAD FERRARI
+// --- FAIL-SAFE CAR LOADER ---
 let car;
 const loader = new THREE.GLTFLoader();
-loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Ferrari.glb', (gltf) => {
-    car = gltf.scene;
-    car.scale.set(1.5, 1.5, 1.5);
-    car.rotation.y = Math.PI;
+
+function createFallback() {
+    const geo = new THREE.BoxGeometry(2, 0.8, 4);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x00f2ff, metalness: 0.8, roughness: 0.2 });
+    car = new THREE.Mesh(geo, mat);
     scene.add(car);
     document.getElementById('loading').style.display = 'none';
-});
+}
 
-// SPEED LOGIC
-let speed = 0;
+loader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Ferrari.glb', 
+    (gltf) => {
+        car = gltf.scene;
+        car.scale.set(1.5, 1.5, 1.5);
+        car.rotation.y = Math.PI;
+        scene.add(car);
+        document.getElementById('loading').style.display = 'none';
+    }, undefined, (err) => {
+        console.log("External model blocked, using Fallback.");
+        createFallback();
+    }
+);
+
+let speed = 0, nitro = 100;
 const keys = {};
 window.onkeydown = (e) => keys[e.code] = true;
 window.onkeyup = (e) => keys[e.code] = false;
@@ -79,27 +91,30 @@ window.onkeyup = (e) => keys[e.code] = false;
 function animate() {
     requestAnimationFrame(animate);
     if (car) {
-        // Accelerate
-        if (keys['KeyW'] || keys['ArrowUp']) {
-            if (speed < 2.0) speed += 0.02;
-        } else {
-            speed *= 0.97; // Natural slowdown
-        }
+        let isBoosting = keys['ShiftLeft'] && nitro > 0;
+        let maxSpeed = isBoosting ? 2.5 : 1.4;
 
-        // --- THE SPEED DISPLAY FIX ---
-        // We multiply the small 'game speed' (2.0) by 150 to get a realistic KM/H number
-        let displaySpeed = Math.floor(speed * 150);
-        document.getElementById('kmh-value').innerText = displaySpeed;
+        if (keys['ArrowUp'] || keys['KeyW']) {
+            if (speed < maxSpeed) speed += 0.02;
+        } else { speed *= 0.97; }
 
-        // Steering
-        if (keys['KeyA'] || keys['ArrowLeft']) car.position.x -= speed * 0.3;
-        if (keys['KeyD'] || keys['ArrowRight']) car.position.x += speed * 0.3;
+        if (keys['ArrowLeft'] || keys['KeyA']) car.position.x -= speed * 0.4;
+        if (keys['ArrowRight'] || keys['KeyD']) car.position.x += speed * 0.4;
 
-        // Move Road
-        grid.position.z += speed * 20;
-        if (grid.position.z > 20) grid.position.z = 0;
+        // UI Updates
+        document.getElementById('kmh-num').innerText = Math.floor(speed * 180);
+        document.getElementById('player-dot').style.left = (50 + car.position.x * 3) + "%";
+        
+        // Track Movement
+        trackGroup.position.z += speed * 20;
+        if (trackGroup.position.z > 50) trackGroup.position.z = 0;
 
-        // Camera Follow
+        // Nitro & Camera
+        if (isBoosting) { nitro -= 0.5; camera.fov = 85; } 
+        else { camera.fov = 75; if (nitro < 100) nitro += 0.1; }
+        camera.updateProjectionMatrix();
+        document.getElementById('nitro-fill').style.width = nitro + "%";
+
         camera.position.set(car.position.x, 2.5, car.position.z + 8);
         camera.lookAt(car.position.x, 1, car.position.z - 5);
     }
