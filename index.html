@@ -3,150 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tokyo Bolide: Dual-Speed Edition</title>
+    <title>Asphalt 8: Haptic Tokyo</title>
     <style>
-        :root { --kmh: #00f2ff; --mph: #ff00ea; --brake: #ff3300; --hand: #ffaa00; }
+        :root { --neon: #00f2ff; --nitro: #00ff88; --brake: #ff3300; }
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial Black', sans-serif; user-select: none; touch-action: none; }
-        
         #ui { position: absolute; inset: 0; pointer-events: none; z-index: 100; color: white; }
         
-        /* DUAL SPEEDOMETERS */
-        .speed-box { position: absolute; top: 20px; text-align: center; width: 120px; }
-        #kmh-ui { left: 20px; color: var(--kmh); text-shadow: 0 0 15px var(--kmh); }
-        #mph-ui { right: 20px; color: var(--mph); text-shadow: 0 0 15px var(--mph); }
-        .val { font-size: 45px; font-style: italic; line-height: 1; }
-        .unit { font-size: 14px; opacity: 0.8; }
+        .speed-box { position: absolute; top: 15px; text-align: center; }
+        #kmh-ui { left: 15px; color: var(--neon); }
+        #mph-ui { left: 110px; color: #ff00ea; font-size: 12px; margin-top: 10px; }
+        #map { position: absolute; top: 15px; right: 15px; width: 100px; height: 100px; background: rgba(0,0,0,0.6); border: 1px solid var(--neon); border-radius: 5px; }
+        #player-dot { position: absolute; width: 6px; height: 6px; background: #fff; border-radius: 50%; left: 50%; bottom: 10%; }
 
-        /* TOUCH BUTTONS */
-        .btn { 
-            position: absolute; pointer-events: auto; background: rgba(0,0,0,0.8); 
-            border: 2px solid #fff; border-radius: 12px; display: flex; 
-            align-items: center; justify-content: center; font-size: 11px; font-weight: bold;
-        }
-        #gas { bottom: 20px; right: 20px; width: 85px; height: 130px; border-color: var(--kmh); color: var(--kmh); font-size: 18px; }
-        #brake { bottom: 20px; right: 115px; width: 70px; height: 80px; border-color: var(--brake); color: var(--brake); }
-        #hand { bottom: 110px; right: 115px; width: 70px; height: 40px; border-color: var(--hand); color: var(--hand); }
-        #nitro { bottom: 160px; right: 20px; width: 85px; height: 50px; border-color: var(--mph); color: var(--mph); }
-        #left { bottom: 20px; left: 20px; width: 85px; height: 85px; }
-        #right { bottom: 20px; left: 115px; width: 85px; height: 85px; }
+        /* PEDALS (Right Side) */
+        .pedal { position: absolute; pointer-events: auto; background: #222; border: 3px solid #666; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 10px; }
+        #gas-pedal { bottom: 20px; right: 20px; width: 60px; height: 120px; background: linear-gradient(#444, #111); border-color: #888; }
+        #brake-pedal { bottom: 20px; right: 100px; width: 50px; height: 80px; background: linear-gradient(#444, #111); border-color: var(--brake); }
+        #handbrake { bottom: 150px; right: 25px; width: 50px; height: 50px; border-radius: 50%; border-color: #ffa500; font-size: 8px; color: #ffa500; }
+        
+        /* STEERING (Left Side) */
+        .steer-btn { position: absolute; pointer-events: auto; bottom: 30px; width: 85px; height: 85px; background: rgba(255,255,255,0.1); border: 2px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; }
+        #left { left: 20px; }
+        #right { left: 115px; }
 
-        #loading { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; z-index: 1000; color: var(--kmh); }
+        #loading { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; z-index: 1000; color: var(--neon); }
     </style>
 </head>
 <body>
 
-<div id="loading">SYNCING TOKYO SERVERS...</div>
+<div id="loading">ACTIVATING HAPTICS...</div>
 
 <div id="ui">
-    <div id="kmh-ui" class="speed-box"><div class="val" id="kmh-val">0</div><div class="unit">KM/H</div></div>
-    <div id="mph-ui" class="speed-box"><div class="val" id="mph-val">0</div><div class="unit">MPH</div></div>
+    <div id="kmh-ui" class="speed-box"><div style="font-size: 30px;" id="kmh-val">0</div>KM/H</div>
+    <div id="mph-ui" class="speed-box"><div id="mph-val">0</div>MPH</div>
+    <div id="map"><div id="player-dot"></div></div>
 
-    <div id="left" class="btn">◀ STEER</div>
-    <div id="right" class="btn">STEER ▶</div>
-    <div id="gas" class="btn">GAS</div>
-    <div id="brake" class="btn">BRAKE</div>
-    <div id="nitro" class="btn">NITRO</div>
-    <div id="hand" class="btn">DRIFT</div>
+    <div id="left" class="steer-btn">◀</div>
+    <div id="right" class="steer-btn">▶</div>
+    <div id="gas-pedal" class="pedal">GAS</div>
+    <div id="brake-pedal" class="pedal">BRAKE</div>
+    <div id="handbrake" class="pedal">H-BRAKE</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
 <script>
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x000000, 10, 110);
+scene.fog = new THREE.Fog(0x000000, 20, 150);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// TOKYO NIGHTSCAPE
-function createBuilding(x, z) {
-    const h = 25 + Math.random() * 50;
-    const b = new THREE.Mesh(new THREE.BoxGeometry(6, h, 6), new THREE.MeshStandardMaterial({color: 0x080808}));
-    b.position.set(x, h/2, z);
-    scene.add(b);
-    const glow = new THREE.LineSegments(new THREE.EdgesGeometry(b.geometry), new THREE.LineBasicMaterial({color: Math.random() > 0.5 ? 0x00f2ff : 0xff00ea, transparent: true, opacity: 0.3}));
-    b.add(glow);
+const world = new THREE.Group(); scene.add(world);
+const bridge = new THREE.Mesh(new THREE.BoxGeometry(40, 1, 100), new THREE.MeshStandardMaterial({color: 0x111111}));
+bridge.position.set(0, -0.5, -150); world.add(bridge);
+
+const ramp = new THREE.Mesh(new THREE.BoxGeometry(8, 0.5, 15), new THREE.MeshStandardMaterial({color: 0x00ff88, emissive: 0x00ff88}));
+ramp.position.set(10, 1, -80); ramp.rotation.x = -0.3; world.add(ramp);
+
+for(let i=0; i<40; i++) {
+    const h = 20 + Math.random()*50;
+    const b = new THREE.Mesh(new THREE.BoxGeometry(10, h, 10), new THREE.MeshStandardMaterial({color: 0x050505}));
+    b.position.set(i % 2 === 0 ? -35 : 35, h/2, -i*30); world.add(b);
 }
-for(let i=0; i<60; i++) { createBuilding(-35, -i*20); createBuilding(35, -i*20); }
+world.add(new THREE.GridHelper(2000, 100, 0x00f2ff, 0x222222));
 
-const road = new THREE.Group(); scene.add(road);
-road.add(new THREE.GridHelper(1000, 40, 0x00f2ff, 0x222222));
-
-// SMOKE SYSTEM
-const smoke = [];
-function addSmoke(x, z) {
-    const p = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), new THREE.MeshBasicMaterial({color: 0x00f2ff, transparent: true, opacity: 0.5}));
-    p.position.set(x, 0.3, z);
-    scene.add(p); smoke.push(p);
-}
-
-// BUGATTI BOLIDE CUSTOM MESH
 const bolide = new THREE.Group();
-const bBody = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.5, 5), new THREE.MeshStandardMaterial({color: 0x0033ff, metalness: 1, roughness: 0.1}));
-const bWing = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.1, 1.2), new THREE.MeshStandardMaterial({color: 0x111}));
-bWing.position.set(0, 0.7, 2);
-const xLights = new THREE.Mesh(new THREE.BoxGeometry(2, 0.2, 0.1), new THREE.MeshBasicMaterial({color: 0xff00ea}));
-xLights.position.set(0, 0.2, 2.5); // Rear X-Light vibe
-bolide.add(bBody, bWing, xLights);
-scene.add(bolide);
-scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+bolide.add(new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.5, 5), new THREE.MeshStandardMaterial({color: 0x0055ff, metalness: 1})));
+const wing = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.1, 1), new THREE.MeshStandardMaterial({color: 0x000}));
+wing.position.set(0, 0.6, 2); bolide.add(wing);
+scene.add(bolide); scene.add(new THREE.AmbientLight(0xffffff, 1));
 
-// PHYSICS & CONTROLS
-let speed = 0, nitro = 100;
-const input = { gas: false, brake: false, left: false, right: false, nitro: false, hand: false };
+let speed = 0, driftActive = false, nitroActive = 0, touchStartY = 0;
+const input = { gas: false, brake: false, left: false, right: false, hand: false };
+
 const bind = (id, key) => {
     const el = document.getElementById(id);
     el.onpointerdown = (e) => { e.preventDefault(); input[key] = true; };
     el.onpointerup = (e) => { e.preventDefault(); input[key] = false; };
 };
-['left','right','gas','brake','nitro','hand'].forEach(k => bind(k, k));
+['left','right','gas-pedal','brake-pedal','handbrake'].forEach((id, i) => {
+    bind(id, ['left','right','gas','brake','hand'][i]);
+});
+
+window.addEventListener('touchstart', e => touchStartY = e.touches[0].clientY);
+window.addEventListener('touchend', e => {
+    let swipeDist = touchStartY - e.changedTouches[0].clientY;
+    if(swipeDist > 50) { // Nitro
+        nitroActive = 60;
+        if(navigator.vibrate) navigator.vibrate(100); 
+    }
+    if(swipeDist < -50) { // Drift
+        driftActive = !driftActive;
+        if(navigator.vibrate) navigator.vibrate([30, 30, 30]);
+    }
+});
 
 function animate() {
     requestAnimationFrame(animate);
     
-    // Drive logic
-    if(input.gas) speed += (input.nitro && nitro > 0 ? 0.07 : 0.025);
-    if(input.brake) speed *= 0.82;
-    if(!input.gas && !input.brake) speed *= 0.985;
+    if(input.gas) speed += (nitroActive > 0 ? 0.08 : 0.03);
+    if(input.brake) speed *= 0.8;
+    if(!input.gas && !input.brake) speed *= 0.98;
 
-    let steerStr = input.hand ? 0.7 : 0.35;
-    if(input.left) { bolide.position.x -= speed * steerStr; bolide.rotation.y = 0.15; }
-    else if(input.right) { bolide.position.x += speed * steerStr; bolide.rotation.y = -0.15; }
-    else { bolide.rotation.y = 0; }
+    let steer = (driftActive || input.hand) ? 0.8 : 0.4;
+    if(input.left) { bolide.position.x -= speed * steer; bolide.rotation.z = 0.15; }
+    else if(input.right) { bolide.position.x += speed * steer; bolide.rotation.z = -0.15; }
+    else { bolide.rotation.z = 0; }
 
-    // Smoke effect
-    if(speed > 0.4 && (input.hand || input.left || input.right)) {
-        addSmoke(bolide.position.x, -1);
+    if(driftActive && speed > 0.2 && navigator.vibrate) {
+        navigator.vibrate(10); // Continuous rumble while drifting
     }
-    smoke.forEach((p, i) => {
-        p.position.y += 0.06; p.scale.multiplyScalar(1.03); p.material.opacity -= 0.03;
-        if(p.material.opacity <= 0) { scene.remove(p); smoke.splice(i, 1); }
-    });
 
-    road.position.z += speed * 25;
-    if(road.position.z > 25) road.position.z = 0;
+    if(nitroActive > 0) { nitroActive--; camera.fov = 85; } else { camera.fov = 75; }
+    camera.updateProjectionMatrix();
 
-    // UI UPDATES (DUAL SPEED)
-    let kmh = Math.floor(speed * 190);
-    let mph = Math.floor(kmh * 0.621371);
+    world.position.z += speed * 25;
+    if(world.position.z > 500) world.position.z = 0;
+
+    let kmh = Math.floor(speed * 205);
     document.getElementById('kmh-val').innerText = kmh;
-    document.getElementById('mph-val').innerText = mph;
+    document.getElementById('mph-val').innerText = Math.floor(kmh * 0.62);
+    document.getElementById('player-dot').style.left = (50 + bolide.position.x * 2) + "%";
 
-    camera.position.set(bolide.position.x, 3, 9);
+    camera.position.set(bolide.position.x, 3, 10);
     camera.lookAt(bolide.position.x, 1, -5);
-    
     renderer.render(scene, camera);
     document.getElementById('loading').style.display = 'none';
 }
 animate();
-
-window.onresize = () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-};
 </script>
 </body>
 </html>
