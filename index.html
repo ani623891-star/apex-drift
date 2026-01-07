@@ -3,145 +3,150 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tokyo Drift: Bolide Edition</title>
+    <title>Tokyo Bolide: Dual-Speed Edition</title>
     <style>
-        :root { --neon: #00f2ff; --nitro: #ff00ea; --brake: #ff3300; --handbrake: #ffaa00; }
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial Black', sans-serif; user-select: none; }
+        :root { --kmh: #00f2ff; --mph: #ff00ea; --brake: #ff3300; --hand: #ffaa00; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial Black', sans-serif; user-select: none; touch-action: none; }
         
-        /* HUD & UI */
         #ui { position: absolute; inset: 0; pointer-events: none; z-index: 100; color: white; }
-        #speedo { position: absolute; top: 20px; left: 20px; text-shadow: 0 0 10px var(--neon); }
-        #kmh { font-size: 50px; font-style: italic; }
-        #nitro-bar { width: 150px; height: 10px; background: #222; border: 1px solid #fff; margin-top: 5px; }
-        #nitro-fill { height: 100%; background: var(--nitro); width: 100%; transition: 0.1s; }
+        
+        /* DUAL SPEEDOMETERS */
+        .speed-box { position: absolute; top: 20px; text-align: center; width: 120px; }
+        #kmh-ui { left: 20px; color: var(--kmh); text-shadow: 0 0 15px var(--kmh); }
+        #mph-ui { right: 20px; color: var(--mph); text-shadow: 0 0 15px var(--mph); }
+        .val { font-size: 45px; font-style: italic; line-height: 1; }
+        .unit { font-size: 14px; opacity: 0.8; }
 
-        /* TOUCH CONTROLS - Pro Layout */
+        /* TOUCH BUTTONS */
         .btn { 
-            position: absolute; pointer-events: auto; background: rgba(0,0,0,0.6); 
+            position: absolute; pointer-events: auto; background: rgba(0,0,0,0.8); 
             border: 2px solid #fff; border-radius: 12px; display: flex; 
-            align-items: center; justify-content: center; font-size: 14px; font-weight: bold;
+            align-items: center; justify-content: center; font-size: 11px; font-weight: bold;
         }
-        #gas { bottom: 30px; right: 20px; width: 90px; height: 120px; border-color: var(--neon); color: var(--neon); }
-        #brake { bottom: 30px; right: 125px; width: 70px; height: 80px; border-color: var(--brake); color: var(--brake); }
-        #handbrake { bottom: 30px; right: 210px; width: 60px; height: 60px; border-color: var(--handbrake); color: var(--handbrake); }
-        #nitro { bottom: 150px; right: 20px; width: 90px; height: 50px; border-color: var(--nitro); color: var(--nitro); }
-        #left { bottom: 30px; left: 20px; width: 80px; height: 80px; }
-        #right { bottom: 30px; left: 110px; width: 80px; height: 80px; }
+        #gas { bottom: 20px; right: 20px; width: 85px; height: 130px; border-color: var(--kmh); color: var(--kmh); font-size: 18px; }
+        #brake { bottom: 20px; right: 115px; width: 70px; height: 80px; border-color: var(--brake); color: var(--brake); }
+        #hand { bottom: 110px; right: 115px; width: 70px; height: 40px; border-color: var(--hand); color: var(--hand); }
+        #nitro { bottom: 160px; right: 20px; width: 85px; height: 50px; border-color: var(--mph); color: var(--mph); }
+        #left { bottom: 20px; left: 20px; width: 85px; height: 85px; }
+        #right { bottom: 20px; left: 115px; width: 85px; height: 85px; }
 
-        #loading { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; z-index: 1000; color: var(--neon); }
+        #loading { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; z-index: 1000; color: var(--kmh); }
     </style>
 </head>
 <body>
 
-<div id="loading">ENTERING TOKYO...</div>
+<div id="loading">SYNCING TOKYO SERVERS...</div>
 
 <div id="ui">
-    <div id="speedo">
-        <div id="kmh">0</div><small>KM/H</small>
-        <div id="nitro-bar"><div id="nitro-fill"></div></div>
-    </div>
+    <div id="kmh-ui" class="speed-box"><div class="val" id="kmh-val">0</div><div class="unit">KM/H</div></div>
+    <div id="mph-ui" class="speed-box"><div class="val" id="mph-val">0</div><div class="unit">MPH</div></div>
 
-    <div id="left" class="btn">STEER L</div>
-    <div id="right" class="btn">STEER R</div>
+    <div id="left" class="btn">◀ STEER</div>
+    <div id="right" class="btn">STEER ▶</div>
     <div id="gas" class="btn">GAS</div>
     <div id="brake" class="btn">BRAKE</div>
     <div id="nitro" class="btn">NITRO</div>
-    <div id="handbrake" class="btn">H-BRAKE</div>
+    <div id="hand" class="btn">DRIFT</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x020205, 10, 80);
+scene.fog = new THREE.Fog(0x000000, 10, 110);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// TOKYO ENVIRONMENT (Neon Buildings & Stars)
-const ambient = new THREE.AmbientLight(0xffffff, 0.4); scene.add(ambient);
-const nightSky = new THREE.Color(0x020205); scene.background = nightSky;
-
-function createTokyoBuilding(x, z) {
-    const h = 15 + Math.random() * 40;
-    const b = new THREE.Mesh(new THREE.BoxGeometry(6, h, 6), new THREE.MeshStandardMaterial({color: 0x050505}));
+// TOKYO NIGHTSCAPE
+function createBuilding(x, z) {
+    const h = 25 + Math.random() * 50;
+    const b = new THREE.Mesh(new THREE.BoxGeometry(6, h, 6), new THREE.MeshStandardMaterial({color: 0x080808}));
     b.position.set(x, h/2, z);
     scene.add(b);
-    const neon = new THREE.LineSegments(new THREE.EdgesGeometry(b.geometry), new THREE.LineBasicMaterial({color: Math.random() > 0.5 ? 0x00f2ff : 0xff00ea, transparent: true, opacity: 0.4}));
-    b.add(neon);
+    const glow = new THREE.LineSegments(new THREE.EdgesGeometry(b.geometry), new THREE.LineBasicMaterial({color: Math.random() > 0.5 ? 0x00f2ff : 0xff00ea, transparent: true, opacity: 0.3}));
+    b.add(glow);
 }
-for(let i=0; i<50; i++) { createTokyoBuilding(-25, -i*20); createTokyoBuilding(25, -i*20); }
+for(let i=0; i<60; i++) { createBuilding(-35, -i*20); createBuilding(35, -i*20); }
 
-// ROAD
 const road = new THREE.Group(); scene.add(road);
-road.add(new THREE.GridHelper(1000, 50, 0xff00ea, 0x111111));
+road.add(new THREE.GridHelper(1000, 40, 0x00f2ff, 0x222222));
 
-// BUGATTI BOLIDE LOADER
-let car;
-const loader = new THREE.GLTFLoader();
-const BOLIDE_URL = 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/models/gltf/Ferrari.glb'; // Temporary reliable source
-
-function buildVisualBolide() {
-    const group = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.6, 4.5), new THREE.MeshStandardMaterial({color: 0x0055ff, metalness: 0.9}));
-    group.add(body);
-    const wing = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.1, 0.8), new THREE.MeshStandardMaterial({color: 0x000000}));
-    wing.position.set(0, 0.6, 1.8);
-    group.add(wing);
-    return group;
+// SMOKE SYSTEM
+const smoke = [];
+function addSmoke(x, z) {
+    const p = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), new THREE.MeshBasicMaterial({color: 0x00f2ff, transparent: true, opacity: 0.5}));
+    p.position.set(x, 0.3, z);
+    scene.add(p); smoke.push(p);
 }
 
-loader.load(BOLIDE_URL, (gltf) => {
-    car = gltf.scene; car.scale.set(1.6, 1.6, 1.6); car.rotation.y = Math.PI;
-    scene.add(car); document.getElementById('loading').style.display = 'none';
-}, undefined, (e) => {
-    car = buildVisualBolide(); scene.add(car); document.getElementById('loading').style.display = 'none';
-});
+// BUGATTI BOLIDE CUSTOM MESH
+const bolide = new THREE.Group();
+const bBody = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.5, 5), new THREE.MeshStandardMaterial({color: 0x0033ff, metalness: 1, roughness: 0.1}));
+const bWing = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.1, 1.2), new THREE.MeshStandardMaterial({color: 0x111}));
+bWing.position.set(0, 0.7, 2);
+const xLights = new THREE.Mesh(new THREE.BoxGeometry(2, 0.2, 0.1), new THREE.MeshBasicMaterial({color: 0xff00ea}));
+xLights.position.set(0, 0.2, 2.5); // Rear X-Light vibe
+bolide.add(bBody, bWing, xLights);
+scene.add(bolide);
+scene.add(new THREE.AmbientLight(0xffffff, 0.9));
 
-// GAME LOGIC
-let speed = 0, nitro = 100, driftFactor = 0;
-const input = { gas: false, brake: false, left: false, right: false, nitro: false, handbrake: false };
-
-const setupBtn = (id, key) => {
+// PHYSICS & CONTROLS
+let speed = 0, nitro = 100;
+const input = { gas: false, brake: false, left: false, right: false, nitro: false, hand: false };
+const bind = (id, key) => {
     const el = document.getElementById(id);
-    const start = (e) => { e.preventDefault(); input[key] = true; };
-    const end = (e) => { e.preventDefault(); input[key] = false; };
-    el.addEventListener('touchstart', start); el.addEventListener('touchend', end);
-    el.addEventListener('mousedown', start); el.addEventListener('mouseup', end);
+    el.onpointerdown = (e) => { e.preventDefault(); input[key] = true; };
+    el.onpointerup = (e) => { e.preventDefault(); input[key] = false; };
 };
-['gas','brake','left','right','nitro','handbrake'].forEach(k => setupBtn(k, k));
+['left','right','gas','brake','nitro','hand'].forEach(k => bind(k, k));
 
 function animate() {
     requestAnimationFrame(animate);
-    if(car) {
-        // Physics logic
-        if(input.gas) speed += (input.nitro && nitro > 0 ? 0.05 : 0.02);
-        if(input.brake) speed *= 0.85;
-        if(input.handbrake) { speed *= 0.95; driftFactor = 0.5; } else { driftFactor = 0.3; }
-        if(!input.gas && !input.brake) speed *= 0.98;
-        
-        if(input.left) car.position.x -= speed * driftFactor;
-        if(input.right) car.position.x += speed * driftFactor;
+    
+    // Drive logic
+    if(input.gas) speed += (input.nitro && nitro > 0 ? 0.07 : 0.025);
+    if(input.brake) speed *= 0.82;
+    if(!input.gas && !input.brake) speed *= 0.985;
 
-        // Nitro Use
-        if(input.nitro && nitro > 0) { nitro -= 0.8; camera.fov = 85; } 
-        else { camera.fov = 75; if(nitro < 100) nitro += 0.1; }
-        camera.updateProjectionMatrix();
+    let steerStr = input.hand ? 0.7 : 0.35;
+    if(input.left) { bolide.position.x -= speed * steerStr; bolide.rotation.y = 0.15; }
+    else if(input.right) { bolide.position.x += speed * steerStr; bolide.rotation.y = -0.15; }
+    else { bolide.rotation.y = 0; }
 
-        road.position.z += speed * 25;
-        if(road.position.z > 20) road.position.z = 0;
-
-        document.getElementById('kmh').innerText = Math.floor(speed * 180);
-        document.getElementById('nitro-fill').style.width = nitro + "%";
-        
-        camera.position.set(car.position.x, 2.5, car.position.z + 8);
-        camera.lookAt(car.position.x, 1, car.position.z - 5);
+    // Smoke effect
+    if(speed > 0.4 && (input.hand || input.left || input.right)) {
+        addSmoke(bolide.position.x, -1);
     }
+    smoke.forEach((p, i) => {
+        p.position.y += 0.06; p.scale.multiplyScalar(1.03); p.material.opacity -= 0.03;
+        if(p.material.opacity <= 0) { scene.remove(p); smoke.splice(i, 1); }
+    });
+
+    road.position.z += speed * 25;
+    if(road.position.z > 25) road.position.z = 0;
+
+    // UI UPDATES (DUAL SPEED)
+    let kmh = Math.floor(speed * 190);
+    let mph = Math.floor(kmh * 0.621371);
+    document.getElementById('kmh-val').innerText = kmh;
+    document.getElementById('mph-val').innerText = mph;
+
+    camera.position.set(bolide.position.x, 3, 9);
+    camera.lookAt(bolide.position.x, 1, -5);
+    
     renderer.render(scene, camera);
+    document.getElementById('loading').style.display = 'none';
 }
 animate();
+
+window.onresize = () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+};
 </script>
 </body>
 </html>
