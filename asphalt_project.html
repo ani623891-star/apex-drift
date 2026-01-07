@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apex Drift: Next Gen</title>
+    <style>
+        :root { --neon-blue: #00f2ff; --nitro-orange: #ff5e00; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+        
+        /* Asphalt Style UI */
+        #ui-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+        
+        #speed-hud { position: absolute; bottom: 40px; right: 50px; text-align: right; }
+        #kmh { font-size: 80px; color: white; font-style: italic; font-weight: 900; }
+        
+        #nitro-container { position: absolute; top: 30px; left: 50%; transform: translateX(-50%); width: 400px; height: 12px; background: rgba(255,255,255,0.2); border-radius: 20px; overflow: hidden; border: 2px solid white; }
+        #nitro-bar { width: 60%; height: 100%; background: linear-gradient(90deg, var(--neon-blue), #fff); box-shadow: 0 0 20px var(--neon-blue); }
+        
+        #car-tag { position: absolute; top: 30px; left: 30px; color: white; border-left: 5px solid var(--nitro-orange); padding-left: 15px; }
+        #car-name { font-size: 24px; font-weight: bold; text-transform: uppercase; }
+        
+        #garage-btn { position: absolute; bottom: 30px; left: 30px; pointer-events: auto; background: white; padding: 10px 30px; font-weight: bold; cursor: pointer; border: none; skewX: -20deg; }
+    </style>
+</head>
+<body>
+
+<div id="ui-layer">
+    <div id="car-tag">
+        <div id="car-name">S-Class // McLaren Senna</div>
+        <div id="car-tier">RANK 3502</div>
+    </div>
+
+    <div id="nitro-container"><div id="nitro-bar"></div></div>
+
+    <div id="speed-hud">
+        <div id="kmh">0</div>
+        <div style="color: var(--neon-blue); font-weight: bold;">KM/H</div>
+    </div>
+    
+    <button id="garage-btn" onclick="changeCar()">NEXT CAR</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+// --- CORE ENGINE ---
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+
+// --- SCENE ENVIRONMENT ---
+scene.fog = new THREE.Fog(0x000000, 20, 150);
+const light = new THREE.PointLight(0xffffff, 1, 100);
+light.position.set(0, 10, 10);
+scene.add(light);
+scene.add(new THREE.AmbientLight(0x222222));
+
+// --- ROAD SYSTEM (Asphalt Style) ---
+const roadTex = new THREE.GridHelper(200, 40, 0x00f2ff, 0x222222);
+scene.add(roadTex);
+
+// --- CAR CLASS (The 1 Lakh Database Logic) ---
+class CarData {
+    constructor(name, topSpeed, accel, color) {
+        this.name = name;
+        this.topSpeed = topSpeed;
+        this.accel = accel;
+        this.color = color;
+    }
+}
+
+const carList = [
+    new CarData("Lamborghini Terzo", 2.2, 0.02, 0xff0044),
+    new CarData("Bugatti Bolide", 2.8, 0.015, 0x0044ff),
+    new CarData("Ferrari FXX K", 2.4, 0.025, 0xffffff)
+];
+
+let currentCarIdx = 0;
+let speed = 0;
+let nitro = 100;
+let driftMode = false;
+let rotationTarget = 0;
+
+// Create 3D Car Placeholder
+const carGeometry = new THREE.BoxGeometry(1.8, 0.6, 4);
+const carMaterial = new THREE.MeshPhongMaterial({ color: carList[0].color, shininess: 100 });
+const carMesh = new THREE.Mesh(carGeometry, carMaterial);
+scene.add(carMesh);
+
+// --- CONTROLS ---
+const keys = {};
+window.onkeydown = (e) => keys[e.code] = true;
+window.onkeyup = (e) => keys[e.code] = false;
+
+function changeCar() {
+    currentCarIdx = (currentCarIdx + 1) % carList.length;
+    const data = carList[currentCarIdx];
+    document.getElementById('car-name').innerText = "S-Class // " + data.name;
+    carMesh.material.color.setHex(data.color);
+}
+
+function update() {
+    const data = carList[currentCarIdx];
+
+    // Asphalt Nitro Logic
+    let isBoosting = keys['ShiftLeft'] && nitro > 0;
+    let maxS = isBoosting ? data.topSpeed * 1.6 : data.topSpeed;
+    
+    if (keys['ArrowUp'] || keys['KeyW']) {
+        if (speed < maxS) speed += data.accel;
+    } else {
+        speed *= 0.98;
+    }
+
+    // Nitro Effects
+    if (isBoosting) {
+        nitro -= 0.4;
+        camera.fov = Math.min(camera.fov + 1, 90); // Zoom out effect
+    } else {
+        camera.fov = Math.max(camera.fov - 1, 70);
+        if (nitro < 100) nitro += 0.1;
+    }
+    camera.updateProjectionMatrix();
+
+    // Drifting Physics
+    if (keys['Space']) {
+        driftMode = true;
+        speed *= 0.99; // Slight drift drag
+    } else {
+        driftMode = false;
+    }
+
+    // Steering
+    if (keys['ArrowLeft'] || keys['KeyA']) {
+        carMesh.position.x -= speed * 0.4;
+        rotationTarget = driftMode ? 0.4 : 0.15;
+    } else if (keys['ArrowRight'] || keys['KeyD']) {
+        carMesh.position.x += speed * 0.4;
+        rotationTarget = driftMode ? -0.4 : -0.15;
+    } else {
+        rotationTarget = 0;
+    }
+
+    // Smooth Rotation (Interpolation)
+    carMesh.rotation.y += (rotationTarget - carMesh.rotation.y) * 0.1;
+
+    // Road Movement
+    roadTex.position.z += speed * 5;
+    if (roadTex.position.z > 20) roadTex.position.z = 0;
+
+    // Camera follow (Lagging effect for speed)
+    camera.position.x += (carMesh.position.x - camera.position.x) * 0.1;
+    camera.position.y = 2.5;
+    camera.position.z = 8;
+    camera.lookAt(carMesh.position.x, 1, -10);
+
+    // Update UI
+    document.getElementById('kmh').innerText = Math.floor(speed * 180);
+    document.getElementById('nitro-bar').style.width = nitro + "%";
+}
+
+function animate() {
+    update();
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+}
+
+animate();
+
+window.onresize = () => {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+};
+</script>
+</body>
+</html>
